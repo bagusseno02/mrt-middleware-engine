@@ -1,0 +1,19 @@
+http_address: "0.0.0.0:8080"
+queue_path: "data/queue.db"
+queue_max_bytes: 1073741824
+
+connections:
+  - id: panel-1
+    transport: tcp
+    address: "192.168.1.100:502" # Replace with your Modbus TCP gateway.
+    timeout: 2s
+    retries: 1
+
+meters:
+  - id: pm5110-01
+    name: "Panel Utama"
+    location: "Ruang Panel"
+    connection: panel-1
+    unit_id: 1
+    interval: 10s
+    energy: true
