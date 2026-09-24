@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: pmmonitor
+      POSTGRES_USER: pmcollector
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pmcollector -d pmmonitor"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  migrate:
+    build: .
+    image: pm5110-collector:local
+    command: ["migrate"]
+    environment:
+      DATABASE_URL: postgres://pmcollector:${POSTGRES_PASSWORD}@postgres:5432/pmmonitor?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  collector:
+    build: .
+    image: pm5110-collector:local
+    environment:
+      DATABASE_URL: postgres://pmcollector:${POSTGRES_PASSWORD}@postgres:5432/pmmonitor?sslmode=disable
+      API_KEY: ${API_KEY:?Set API_KEY in .env}
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - queue-data:/app/data
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    stop_grace_period: 60s
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  queue-data:
